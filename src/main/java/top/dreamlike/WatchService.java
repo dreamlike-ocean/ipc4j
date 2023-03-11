@@ -21,8 +21,6 @@ import static top.dreamlike.nativeLib.inotify.inotify_h.inotify_rm_watch;
 import static top.dreamlike.nativeLib.unistd.unistd_h.read;
 
 public class WatchService implements AutoCloseable, UnsafeFileDescriptor {
-
-
     private final int ifd;
     private final MemorySession memorySession;
     private final MemorySegment buf;
@@ -35,7 +33,6 @@ public class WatchService implements AutoCloseable, UnsafeFileDescriptor {
         }
         memorySession = MemorySession.openShared();
         buf = memorySession.allocate(4048);
-
     }
 
     @Unsafe("内部使用 确保buf可用")
@@ -69,7 +66,6 @@ public class WatchService implements AutoCloseable, UnsafeFileDescriptor {
         }
     }
 
-
     @Unsafe("保证absolutePath 有意义")
     public int register(MemorySegment absolutePath, int mask) {
         int res = inotify_add_watch(ifd, absolutePath, mask);
@@ -81,7 +77,7 @@ public class WatchService implements AutoCloseable, UnsafeFileDescriptor {
 
     public void removeListen(int wd) {
         int res = inotify_rm_watch(ifd, wd);
-        if (res <= 0)
+        if (res < 0)
             throw new NativeCallException(NativeHelper.getNowError());
     }
 
@@ -99,7 +95,6 @@ public class WatchService implements AutoCloseable, UnsafeFileDescriptor {
     public List<FileEvent> selectEvent() {
         return selectEventInternal(buf, (int) read(ifd, buf, buf.byteSize()));
     }
-
 
     @Override
     public void close() throws Exception {
