@@ -48,6 +48,17 @@ public class BaseShareMemory implements AutoCloseable {
         }
     }
 
+    protected BaseShareMemory(String name, int shm_fd, MemorySegment mmap_base, WatchService listener, int wid, int shm_size, int preRead, int preWrite) {
+        this.name = name;
+        this.shm_fd = shm_fd;
+        this.mmap_base = mmap_base;
+        this.listener = listener;
+        this.wid = wid;
+        this.shm_size = shm_size;
+        this.preRead = preRead;
+        this.preWrite = preWrite;
+        this.api = new UnsafeApi();
+    }
 
     public UnsafeApi unsafe() {
         return api;
@@ -170,6 +181,10 @@ public class BaseShareMemory implements AutoCloseable {
         mmap_base.set(ValueLayout.JAVA_INT, WRITE_FIELD_OFFSET, value);
         //触发inotify事件
         return (int) unistd_h.write(shm_fd, mmap_base.asSlice(WRITE_FIELD_OFFSET), ValueLayout.JAVA_INT.byteSize());
+    }
+
+    public int currentSize() {
+        return shm_size - 8;
     }
 
     public class UnsafeApi {
