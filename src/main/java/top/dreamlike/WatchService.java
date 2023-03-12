@@ -34,7 +34,7 @@ public class WatchService implements AutoCloseable, UnsafeFileDescriptor {
             throw new NativeCallException(NativeHelper.getNowError());
         }
         memorySession = MemorySession.openShared();
-        buf = memorySession.allocate(4048);
+        buf = memorySession.allocate(4096);
 
     }
 
@@ -81,7 +81,7 @@ public class WatchService implements AutoCloseable, UnsafeFileDescriptor {
 
     public void removeListen(int wd) {
         int res = inotify_rm_watch(ifd, wd);
-        if (res <= 0)
+        if (res < 0)
             throw new NativeCallException(NativeHelper.getNowError());
     }
 
