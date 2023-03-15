@@ -32,8 +32,8 @@ public class BaseShareMemory implements AutoCloseable {
     protected WatchService listener;
     protected int wid;
     protected int shm_size;
-    protected int preRead;
-    protected int preWrite;
+    protected int preReadVersion;
+    protected int preWriteVersion;
     protected UnsafeApi api;
 
     public BaseShareMemory(String memoryName, int size, boolean isReader, boolean needPopulate) {
@@ -48,15 +48,15 @@ public class BaseShareMemory implements AutoCloseable {
         }
     }
 
-    protected BaseShareMemory(String name, int shm_fd, MemorySegment mmap_base, WatchService listener, int wid, int shm_size, int preRead, int preWrite) {
+    protected BaseShareMemory(String name, int shm_fd, MemorySegment mmap_base, WatchService listener, int wid, int shm_size, int preReadVersion, int preWriteVersion) {
         this.name = name;
         this.shm_fd = shm_fd;
         this.mmap_base = mmap_base;
         this.listener = listener;
         this.wid = wid;
         this.shm_size = shm_size;
-        this.preRead = preRead;
-        this.preWrite = preWrite;
+        this.preReadVersion = preReadVersion;
+        this.preWriteVersion = preWriteVersion;
         this.api = new UnsafeApi();
     }
 
@@ -87,7 +87,7 @@ public class BaseShareMemory implements AutoCloseable {
         this.mmap_base = MemorySegment.ofAddress(memoryAddress, shm_size, MemorySession.global());
         mmap_base.set(ValueLayout.JAVA_INT, WRITE_FIELD_OFFSET, 0);
         mmap_base.set(ValueLayout.JAVA_INT, READ_FIELD_OFFSET, 0);
-        this.preRead = this.preWrite = 0;
+        this.preReadVersion = this.preWriteVersion = 0;
     }
 
     //todo jdk20 scopeLocal+new ffm api 重新实现，先传递下来再说
@@ -117,29 +117,29 @@ public class BaseShareMemory implements AutoCloseable {
 
     protected boolean isReadModify() {
         // 4-8 读了多少
-        int i = currentReadValue();
-        if (i != preRead) {
-            this.preRead = i;
+        int i = currentReadVersion();
+        if (i != preReadVersion) {
+            this.preReadVersion = i;
             return true;
         }
         return false;
     }
 
-    public int currentReadValue() {
+    public int currentReadVersion() {
         return mmap_base.get(ValueLayout.JAVA_INT, READ_FIELD_OFFSET);
     }
 
     protected boolean isWriteModify() {
         // 写了多少
-        int i = currentWriteValue();
-        if (i != preWrite) {
-            this.preWrite = i;
+        int i = currentWriteVersion();
+        if (i != preWriteVersion) {
+            this.preWriteVersion = i;
             return true;
         }
         return false;
     }
 
-    public int currentWriteValue() {
+    public int currentWriteVersion() {
         return mmap_base.get(ValueLayout.JAVA_INT, WRITE_FIELD_OFFSET);
     }
 
@@ -160,28 +160,29 @@ public class BaseShareMemory implements AutoCloseable {
         }
     }
 
-    protected int modifyReadValue(int value) {
+    protected int incrReadVersion(int value) {
         long res = unistd_h.lseek(shm_fd, READ_FIELD_OFFSET, unistd_h.SEEK_SET());
         if (res == -1) {
             return NativeHelper.getErrorNo();
         }
         //直接写入mmap
-        mmap_base.set(ValueLayout.JAVA_INT, READ_FIELD_OFFSET, value);
+        mmap_base.set(ValueLayout.JAVA_INT, READ_FIELD_OFFSET, preReadVersion + 1);
         //触发inotify事件
         return (int) unistd_h.write(shm_fd, mmap_base.asSlice(READ_FIELD_OFFSET), ValueLayout.JAVA_INT.byteSize());
     }
 
 
-    protected int modifyWriteValue(int value) {
+    protected int incrWriteValue(int value) {
         long res = unistd_h.lseek(shm_fd, WRITE_FIELD_OFFSET, unistd_h.SEEK_SET());
         if (res == -1) {
             return NativeHelper.getErrorNo();
         }
         //直接写入mmap
-        mmap_base.set(ValueLayout.JAVA_INT, WRITE_FIELD_OFFSET, value);
+        mmap_base.set(ValueLayout.JAVA_INT, WRITE_FIELD_OFFSET, preWriteVersion + 1);
         //触发inotify事件
         return (int) unistd_h.write(shm_fd, mmap_base.asSlice(WRITE_FIELD_OFFSET), ValueLayout.JAVA_INT.byteSize());
     }
+
 
     public int currentSize() {
         return shm_size - 8;

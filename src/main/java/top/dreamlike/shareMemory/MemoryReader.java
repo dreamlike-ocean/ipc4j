@@ -23,10 +23,10 @@ public class MemoryReader extends ResizableShareMemory {
 
     public void read(ToIntFunction<MemorySegment> readFn) {
         int readValue = readFn.applyAsInt(shareMemory());
-        modifyReadValue(readValue);
+        incrReadVersion(readValue);
     }
 
     public MemoryWriter transToWriter() {
-        return new MemoryWriter(name, shm_fd, mmap_base, listener, wid, shm_size, preRead, preWrite, needPopulate);
+        return new MemoryWriter(name, shm_fd, mmap_base, listener, wid, shm_size, preReadVersion, preWriteVersion, needPopulate);
     }
 }
